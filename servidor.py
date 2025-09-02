@@ -1,15 +1,21 @@
 import socket
 import threading
+import json
 
 HOST = '127.0.0.1'
 PORT = 5000
 
-# Estado do recurso único (a carta)
-carta_disponivel = True
-carta_lock = threading.Lock()  # para evitar corrida de dados
+# Deck inicial de cartas
+cartas_disponiveis = [
+    {"nome": "Dragão Vermelho", "ataque": 3000, "defesa": 2500},
+    {"nome": "Mago Negro", "ataque": 2500, "defesa": 2100},
+    {"nome": "Cavaleiro Branco", "ataque": 1800, "defesa": 1500},
+    {"nome": "Elfa do Vento", "ataque": 1200, "defesa": 1600}
+]
+cartas_lock = threading.Lock()
 
 def handle_client(conn, addr):
-    global carta_disponivel
+    global cartas_disponiveis
     print(f"[NOVA CONEXÃO] Cliente {addr} conectado.")
 
     while True:
@@ -19,16 +25,34 @@ def handle_client(conn, addr):
                 break
             msg = data.decode().strip().lower()
 
-            if msg == "pegar":
-                with carta_lock:  # garante exclusão mútua
-                    if carta_disponivel:
-                        carta_disponivel = False
-                        conn.sendall(b"Você pegou a carta! Agora ela é sua.\n")
-                        print(f"[{addr}] ficou com a carta!")
+            if msg == "listar":
+                with cartas_lock:
+                    if cartas_disponiveis:
+                        lista = "\n".join(
+                            f"{i+1}. {c['nome']} (ATK {c['ataque']} / DEF {c['defesa']})"
+                            for i, c in enumerate(cartas_disponiveis)
+                        )
+                        conn.sendall(f"Cartas disponíveis:\n{lista}\n".encode())
                     else:
-                        conn.sendall(b"A carta já foi pega por outro cliente.\n")
+                        conn.sendall("Nenhuma carta disponível.\n")
+
+            elif msg.startswith("pegar"):
+                partes = msg.split()
+                if len(partes) == 2 and partes[1].isdigit():
+                    idx = int(partes[1]) - 1
+                    with cartas_lock:
+                        if 0 <= idx < len(cartas_disponiveis):
+                            carta = cartas_disponiveis.pop(idx)
+                            # Envia a carta em formato JSON
+                            conn.sendall(f"CARTA {json.dumps(carta)}\n".encode())
+                            print(f"[{addr}] pegou a carta {carta['nome']}.")
+                        else:
+                            conn.sendall("Índice inválido ou carta não disponível.\n")
+                else:
+                    conn.sendall("Uso correto: pegar <numero>\n")
+
             else:
-                conn.sendall(b"Envie 'pegar' para tentar conseguir a carta.\n")
+                conn.sendall("Comandos: 'listar', 'pegar <numero>', 'sair'\n")
 
         except:
             break
