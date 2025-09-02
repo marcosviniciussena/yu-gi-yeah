@@ -1,58 +1,56 @@
-# cliente.py
-import socket
-import time
+import asyncio
 import json
+import time
 
-HOST = "127.0.0.1"  # Endereço do servidor
-PORT = 5000         # Mesma porta do servidor
+HOST = "127.0.0.1"
+PORT = 5000
 
-# Cria socket
-cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-cliente.connect((HOST, PORT))
-
-# Lista local de cartas do jogador
 minhas_cartas = []
 
-print("Comandos:")
-print(" - 'listar' → ver cartas disponíveis")
-print(" - 'pegar <numero>' → tentar pegar uma carta")
-print(" - 'mao' → ver suas cartas")
-print(" - 'sair' → encerrar")
+async def main():
+    reader, writer = await asyncio.open_connection(HOST, PORT)
+    print("Conectado ao servidor.")
 
-while True:
-    msg = input("> ")
-    if msg.lower() == "sair":
-        break
-    elif msg.lower() == "mao":
-        if minhas_cartas:
-            print("Suas cartas:")
-            for i, carta in enumerate(minhas_cartas, 1):
-                print(f"{i}. {carta['nome']} (ATK {carta['ataque']} / DEF {carta['defesa']})")
-        else:
-            print("Você ainda não tem cartas.")
-        continue
+    print("Comandos:")
+    print(" - 'listar' → ver cartas disponíveis")
+    print(" - 'pegar <numero>' → tentar pegar uma carta")
+    print(" - 'mao' → ver suas cartas")
+    print(" - 'duelo' → entrar em uma partida")
+    print(" - 'jogar <num>' → jogar uma carta da sua mão")
+    print(" - 'sair' → encerrar")
 
-    # Marca o tempo antes do envio
-    inicio = time.perf_counter()
+    while True:
+        msg = input("> ")
+        if msg.lower() == "sair":
+            break
+        elif msg.lower() == "mao":
+            if minhas_cartas:
+                print("Suas cartas:")
+                for i, carta in enumerate(minhas_cartas, 1):
+                    print(f"{i}. {carta['nome']} (ATK {carta['ataque']} / DEF {carta['defesa']})")
+            else:
+                print("Você ainda não tem cartas.")
+            continue
 
-    cliente.sendall(msg.encode())       # Envia mensagem
-    resposta = cliente.recv(1024)           # Recebe resposta
+        inicio = time.perf_counter()
+        writer.write((msg + "\n").encode())
+        await writer.drain()
 
-    # Marca o tempo após a resposta
-    fim = time.perf_counter()
-    atraso = (fim - inicio) * 1000  # em milissegundos
+        data = await reader.read(1024)
+        fim = time.perf_counter()
+        atraso = (fim - inicio) * 1000
 
-    print("Resposta do servidor:", resposta.decode().strip())
-    print(f"Atraso: {atraso:.2f} ms\n")
+        resposta = data.decode().strip()
+        print("Resposta:", resposta)
+        print(f"Atraso: {atraso:.2f} ms\n")
 
-    
-    # Se o servidor enviou uma carta (prefixo "CARTA")
-    if resposta.startswith("CARTA "):
-        carta_json = resposta[6:].strip()
-        carta = json.loads(carta_json)
-        minhas_cartas.append(carta)
-        print(f"Você recebeu a carta: {carta['nome']} (ATK {carta['ataque']} / DEF {carta['defesa']})")
-    else:
-        print("Servidor:", resposta)
+        if resposta.startswith("CARTA "):
+            carta_json = resposta[6:].strip()
+            carta = json.loads(carta_json)
+            minhas_cartas.append(carta)
+            print(f"Você recebeu: {carta['nome']} (ATK {carta['ataque']} / DEF {carta['defesa']})")
 
-cliente.close()
+    writer.close()
+    await writer.wait_closed()
+
+asyncio.run(main())
