@@ -1,8 +1,6 @@
 # servidor.py
 import asyncio
 import json
-import threading
-import random
 
 # Lista de cartas do "baralho"
 BARALHO = [
@@ -18,11 +16,15 @@ clientes = {}
 # Fila de jogadores esperando duelo
 fila_duelo = []
 
+# Cada jogador terá sua mão
+maos = {}
+
 
 async def handle_client(reader, writer):
     addr = writer.get_extra_info('peername')
     print(f"Cliente conectado: {addr}")
     clientes[addr] = writer
+    maos[writer] = []  # inicia mão vazia para o jogador
 
     while True:
         try:
@@ -34,9 +36,12 @@ async def handle_client(reader, writer):
             print(f"[{addr}] {msg}")
 
             if msg == "listar":
-                resposta = "Cartas disponíveis:\n"
-                for c in BARALHO:
-                    resposta += f"{c['id']}: {c['nome']} (ATK {c['ataque']} / DEF {c['defesa']})\n"
+                if BARALHO:
+                    resposta = "Cartas disponíveis:\n"
+                    for c in BARALHO:
+                        resposta += f"{c['id']}: {c['nome']} (ATK {c['ataque']} / DEF {c['defesa']})\n"
+                else:
+                    resposta = "Não há cartas disponíveis.\n"
                 writer.write((resposta + "\n").encode())
 
             elif msg.startswith("pegar "):
@@ -45,22 +50,41 @@ async def handle_client(reader, writer):
                     carta = next((c for c in BARALHO if c["id"] == cid), None)
                     if carta:
                         BARALHO.remove(carta)
+                        maos[writer].append(carta)
                         writer.write((f"CARTA {json.dumps(carta)}\n").encode())
+                        print(f"[{addr}] pegou {carta['nome']}.")
                     else:
                         writer.write("Carta não disponível\n".encode())
-                except:
+                except ValueError:
                     writer.write("Comando inválido\n".encode())
 
+            elif msg == "mao":
+                mao = maos.get(writer, [])
+                if mao:
+                    lista = "\n".join(
+                        f"{i+1}. {c['nome']} (ATK {c['ataque']} / DEF {c['defesa']})"
+                        for i, c in enumerate(mao)
+                    )
+                    writer.write(f"Sua mão:\n{lista}\n".encode())
+                else:
+                    writer.write("Você não tem cartas.\n".encode())
+
             elif msg == "duelo":
-                fila_duelo.append((addr, writer))
-                writer.write("Você entrou na fila para duelo...\n".encode())
+                if writer not in fila_duelo:
+                    fila_duelo.append(writer)
+                    writer.write("Você entrou na fila de duelo...\n".encode())
+
                 if len(fila_duelo) >= 2:
                     p1 = fila_duelo.pop(0)
                     p2 = fila_duelo.pop(0)
-                    threading.Thread(target=partida, args=(p1, p2), daemon=True).start()
+                    await resolver_partida(p1, p2)
+
+            elif msg == "sair":
+                writer.write("Saindo do jogo...\n".encode())
+                break
 
             else:
-                writer.write("Comando não reconhecido\n".encode())
+                writer.write("Comandos: listar, pegar <id>, mao, duelo, sair\n".encode())
 
             await writer.drain()
 
@@ -68,49 +92,44 @@ async def handle_client(reader, writer):
             break
 
     print(f"Cliente desconectado: {addr}")
-    del clientes[addr]
+    clientes.pop(addr, None)
+    maos.pop(writer, None)
     writer.close()
     await writer.wait_closed()
 
 
-def partida(p1, p2):
-    """Executa uma partida 1vs1 em thread separada"""
-    addr1, w1 = p1
-    addr2, w2 = p2
+async def resolver_partida(p1, p2):
+    mao1 = maos.get(p1, [])
+    mao2 = maos.get(p2, [])
 
-    try:
-        w1.write("Duelo iniciado contra outro jogador!\n".encode())
-        w2.write("Duelo iniciado contra outro jogador!\n".encode())
+    if len(mao1) < 2 or len(mao2) < 2:
+        msg = "Um dos jogadores não tem cartas suficientes (mínimo 2).\n"
+        p1.write(msg.encode())
+        p2.write(msg.encode())
+        await p1.drain()
+        await p2.drain()
+        return
 
-        # Simples lógica de batalha: cada jogador recebe uma carta aleatória
-        carta1 = random.choice([
-            {"nome": "Espadachim", "ataque": 5, "defesa": 4},
-            {"nome": "Arqueiro", "ataque": 4, "defesa": 5},
-        ])
-        carta2 = random.choice([
-            {"nome": "Orc", "ataque": 6, "defesa": 3},
-            {"nome": "Troll", "ataque": 3, "defesa": 7},
-        ])
+    atk1 = sum(c["ataque"] for c in mao1)
+    def1 = sum(c["defesa"] for c in mao1)
+    atk2 = sum(c["ataque"] for c in mao2)
+    def2 = sum(c["defesa"] for c in mao2)
 
-        w1.write(f"Sua carta: {carta1['nome']} (ATK {carta1['ataque']} / DEF {carta1['defesa']})\n".encode())
-        w2.write(f"Sua carta: {carta2['nome']} (ATK {carta2['ataque']} / DEF {carta2['defesa']})\n".encode())
+    dano1 = atk1 - def2
+    dano2 = atk2 - def1
 
-        # Determina vencedor pelo ataque
-        if carta1["ataque"] > carta2["ataque"]:
-            vencedor = "Jogador 1 venceu!"
-        elif carta2["ataque"] > carta1["ataque"]:
-            vencedor = "Jogador 2 venceu!"
-        else:
-            vencedor = "Empate!"
+    if dano1 > dano2:
+        p1.write("Você venceu o duelo!\n".encode())
+        p2.write("Você perdeu o duelo!\n".encode())
+    elif dano2 > dano1:
+        p1.write("Você perdeu o duelo!\n".encode())
+        p2.write("Você venceu o duelo!\n".encode())
+    else:
+        p1.write("O duelo terminou em empate!\n".encode())
+        p2.write("O duelo terminou em empate!\n".encode())
 
-        w1.write((vencedor + "\n").encode())
-        w2.write((vencedor + "\n").encode())
-
-        asyncio.run_coroutine_threadsafe(w1.drain(), asyncio.get_event_loop())
-        asyncio.run_coroutine_threadsafe(w2.drain(), asyncio.get_event_loop())
-
-    except Exception as e:
-        print("Erro na partida:", e)
+    await p1.drain()
+    await p2.drain()
 
 
 async def main():
@@ -120,6 +139,7 @@ async def main():
 
     async with server:
         await server.serve_forever()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

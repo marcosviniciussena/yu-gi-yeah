@@ -23,19 +23,12 @@ async def main():
         msg = input("> ")
         if msg.lower() == "sair":
             break
-        elif msg.lower() == "mao":
-            if minhas_cartas:
-                print("Suas cartas:")
-                for i, carta in enumerate(minhas_cartas, 1):
-                    print(f"{i}. {carta['nome']} (ATK {carta['ataque']} / DEF {carta['defesa']})")
-            else:
-                print("Você ainda não tem cartas.")
-            continue
 
         inicio = time.perf_counter()
         writer.write((msg + "\n").encode())
-        await writer.drain()
+        await writer.drain() #aqui ele envia a mensagem e a tarefa para de executar até que o buffer esvazie.
 
+        # data = await reader.readline()  # lê até o \n (mais seguro que read(1024))
         data = await reader.read(1024)
         fim = time.perf_counter()
         atraso = (fim - inicio) * 1000
