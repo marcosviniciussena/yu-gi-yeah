@@ -12,6 +12,22 @@ BARALHO = [
     {"id": 2, "nome": "Mago", "ataque": 6, "defesa": 4},
     {"id": 3, "nome": "Guerreiro", "ataque": 7, "defesa": 6},
     {"id": 4, "nome": "Elfo", "ataque": 5, "defesa": 7},
+    {"id": 5, "nome": "Dragão", "ataque": 8, "defesa": 5},
+    {"id": 6, "nome": "Mago", "ataque": 6, "defesa": 4},
+    {"id": 7, "nome": "Guerreiro", "ataque": 7, "defesa": 6},
+    {"id": 8, "nome": "Elfo", "ataque": 5, "defesa": 7},
+    {"id": 9, "nome": "Dragão", "ataque": 8, "defesa": 5},
+    {"id": 10, "nome": "Mago", "ataque": 6, "defesa": 4},
+    {"id": 11, "nome": "Guerreiro", "ataque": 7, "defesa": 6},
+    {"id": 12, "nome": "Elfo", "ataque": 5, "defesa": 7},
+    {"id": 13, "nome": "Guerreiro", "ataque": 7, "defesa": 6},
+    {"id": 14, "nome": "Elfo", "ataque": 5, "defesa": 7},
+    {"id": 15, "nome": "Dragão", "ataque": 8, "defesa": 5},
+    {"id": 16, "nome": "Mago", "ataque": 6, "defesa": 4},
+    {"id": 17, "nome": "Guerreiro", "ataque": 7, "defesa": 6},
+    {"id": 18, "nome": "Elfo", "ataque": 5, "defesa": 7},
+    {"id": 19, "nome": "Dragão", "ataque": 8, "defesa": 5},
+    {"id": 20, "nome": "Mago", "ataque": 6, "defesa": 4},
 ]
 
 maos = {}
