@@ -4,33 +4,22 @@ import time
 HOST = "127.0.0.1"
 PORT_TCP = 5000
 
-# contador global de cartas
-carta_global = 1
-lock = asyncio.Lock()
-
-# métricas
+# métricas globais
 metricas = {
     "erros": 0,
     "respostas": 0,
     "tempos": [],
 }
 
-
 async def jogador_fake(id: int, rodadas=2):
-    global carta_global
-
     try:
         reader, writer = await asyncio.open_connection(HOST, PORT_TCP)
         print(f"[J{id}] conectado")
 
-        # pegar 2 cartas de forma sequencial
+        # pegar cartas (agora sem id, será o servidor que sorteia o pacote)
         for _ in range(2):
-            async with lock:
-                carta_id = carta_global
-                carta_global += 1
-
             inicio = time.perf_counter()
-            writer.write(f"pegar {carta_id}\n".encode())
+            writer.write(b"pegar\n")
             await writer.drain()
             await ler_resposta(reader, id, inicio)
 
@@ -86,8 +75,8 @@ async def ler_resposta(reader, jid, inicio):
 
 
 async def main():
-    N = 10  # número de jogadores simultâneos
-    rodadas = 2
+    N = 1000  # número de jogadores simultâneos
+    rodadas = 2  # número de duelos por jogador
 
     inicio_total = time.perf_counter()
     tarefas = [jogador_fake(i, rodadas) for i in range(1, N + 1)]

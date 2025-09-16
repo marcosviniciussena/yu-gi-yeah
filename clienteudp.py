@@ -31,7 +31,12 @@ async def jogo_tcp():
         return
 
     print("Conectado ao servidor TCP.")
-    print("Comandos: listar, pegar <id>, mao, duelo, ping, sair")
+    print("Comandos:")
+    print(" - 'listar' → ver cartas disponíveis")
+    print(" - 'pegar' → receber pacote com 3 cartas")
+    print(" - 'mao' → ver suas cartas")
+    print(" - 'duelo' → entrar em uma partida")
+    print(" - 'sair' → encerrar")
 
     queue = asyncio.Queue()
     # Inicia a corrotina que só lê o servidor
