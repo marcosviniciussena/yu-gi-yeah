@@ -21,6 +21,7 @@ async def handle_server(reader, queue):
                 await queue.put(linha)
     except (ConnectionResetError, OSError):
         print("⚠ Conexão perdida durante a leitura.")
+        await queue.put(None)
 
 
 async def jogo_tcp():
@@ -41,6 +42,7 @@ async def jogo_tcp():
     queue = asyncio.Queue()
     # Inicia a corrotina que só lê o servidor
     asyncio.create_task(handle_server(reader, queue))
+    asyncio.create_task(processar_fila(queue))
 
     loop = asyncio.get_running_loop()
 
@@ -105,6 +107,14 @@ async def jogo_tcp():
         except Exception:
             pass
         print("❌ Conexão encerrada.")
+
+async def processar_fila(queue):
+    """Processa mensagens que chegam do servidor sem precisar de input"""
+    while True:
+        linha = await queue.get()
+        if linha is None:  # sinal de saída
+            break
+        print(f"\n📩 Servidor: {linha}")  # imprime imediatamente
 
 
 async def medir_ping(loop):

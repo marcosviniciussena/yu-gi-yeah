@@ -92,7 +92,7 @@ async def handle_client(reader, writer):
                 writer.write(resposta.encode())
                 await writer.drain()
 
-            elif msg.startswith("pegar "):
+            elif msg.startswith("pegar"):
                 try:
                     pacote = sortear_pacote()
                     maos[writer].extend(pacote)
